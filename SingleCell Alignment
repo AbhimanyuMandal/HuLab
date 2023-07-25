@@ -1,0 +1,83 @@
+SC.list<-list(TNBC.PDX=TNBC.PDX,Epithelial2=Epithelial2,Epithelial3=Epithelial3,Epithelial4=Epithelial4)
+CellCycle=TRUE #Set it TRUE if you want to do Cell Cycle Regression
+anchor.features=5000
+
+for (i in 1:length(SC.list)) {
+  SC.list[[i]] <- NormalizeData(SC.list[[i]], verbose = FALSE)
+  SC.list[[i]] <- FindVariableFeatures(SC.list[[i]], selection.method = "vst",
+                                       nfeatures = anchor.features, verbose = FALSE)
+}
+
+#Reference dataset
+SC.reference <- list(Epithelial2=Epithelial2,Epithelial3=Epithelial3,Epithelial4=Epithelial4)
+SC.anchors <- FindIntegrationAnchors(object.list = SC.reference, dims = 1:30)
+SC.integrated <- IntegrateData(anchorset = SC.anchors, dims = 1:30)
+
+library(ggplot2)
+library(cowplot)
+library(patchwork)
+DefaultAssay(SC.integrated) <- "integrated"
+SC.integrated <- ScaleData(SC.integrated, verbose = FALSE)
+SC.integrated <- RunPCA(SC.integrated, npcs = 30, verbose = FALSE)
+SC.integrated <- RunUMAP(SC.integrated, reduction = "pca", dims = 1:30, verbose = FALSE)
+
+DimPlot(SC.integrated, reduction = "umap", split.by = "sample", group.by = "celltype")
+
+#Query dataset
+SC.query <- SC.list[["TNBC.PDX"]]
+SC.anchors <- FindTransferAnchors(reference = SC.integrated, query = SC.query,
+                                        dims = 1:30, reference.reduction = "pca")
+predictions <- TransferData(anchorset = SC.anchors, refdata = SC.integrated$celltype,
+                            dims = 1:30)
+SC.query <- AddMetaData(SC.query, metadata = predictions)
+table(SC.query$predicted.id)
+
+SC.integrated <- RunUMAP(SC.integrated, dims = 1:30, reduction = "pca", return.model = TRUE)
+SC.query <- MapQuery(anchorset = SC.anchors, reference = SC.integrated, query = SC.query,
+                           refdata = list(celltype = "celltype"), reference.reduction = "pca", reduction.model = "umap")
+
+sample<-SC.integrated@meta.data$sample
+sample[which(sample=="Ind5")]<-"Normal1"
+sample[which(sample=="Ind6")]<-"Normal2"
+sample[which(sample=="Ind7")]<-"Normal3"
+SC.integrated@meta.data$sample<-sample
+
+#Plotting
+
+p1 <- DimPlot(SC.integrated, reduction = "umap",split.by = "sample", group.by = "celltype") + ggtitle("Reference annotations")
+p2 <- DimPlot(SC.query, reduction = "ref.umap", split.by = "sample", group.by = "celltype") + ggtitle("Query transferred labels")
+p1 + p2
+
+SC.query$prediction.match <- SC.query$predicted.id == SC.query$predicted.celltype
+table(SC.query$prediction.match)
+
+SC.query$prediction.match <- NULL
+SC.query$predicted.celltype.score <- NULL
+SC.query$prediction.score.max <- NULL
+SC.query$predicted.id <- NULL
+SC.query$prediction.score.Basal_epithelial_cells <- NULL
+SC.query$prediction.score.Luminal_L1.1_epithelial_cells <- NULL
+SC.query$prediction.score.Luminal_L1.2_epithelial_cells <- NULL
+SC.query$prediction.score.Luminal_L2_epithelial_cells <- NULL
+colnames(SC.query@meta.data)[colnames(SC.query@meta.data) == "predicted.celltype"] = "celltype"
+
+#Combining two datasets
+SC.merge <- merge(SC.integrated,SC.query)
+
+DefaultAssay(SC.merge) <- "integrated"
+VariableFeatures(SC.merge) <- c(VariableFeatures(SC.integrated), VariableFeatures(SC.query))
+SC.merge <- ScaleData(SC.merge, verbose = FALSE)
+SC.merge <- RunPCA(SC.merge, verbose = FALSE)
+SC.merge <- FindNeighbors(SC.merge, dims = 1:30)
+SC.merge <- FindClusters(SC.merge, verbose = FALSE)
+SC.merge <- RunUMAP(SC.merge, dims = 1:30)
+
+#Change sample names
+sample<-SC.merge@meta.data$sample
+sample[which(sample=="Ind5")]<-"Normal1"
+sample[which(sample=="Ind6")]<-"Normal2"
+sample[which(sample=="Ind7")]<-"Normal3"
+SC.merge@meta.data$sample<-sample
+
+
+DimPlot(SC.merge, reduction = "umap",split.by = "sample", group.by = "celltype")
