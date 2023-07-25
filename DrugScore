@@ -1,0 +1,74 @@
+#Drug repurposing
+library(Asgard)
+
+#Gene.list<-readRDS(paste0("TNBC_genelist_",i,".rds"))
+my_gene_info<-read.table(file="~/Documents/HuLab/DrugReference/breast_gene_info.txt",sep="\t",header = T,quote = "")
+my_drug_info<-read.table(file="~/Documents/HuLab/DrugReference/breast_drug_info.txt",sep="\t",header = T,quote = "")
+cmap.ref.profiles<-GetDrugRef(drug.response.path = '~/Documents/HuLab/DrugReference/breast_rankMatrix.txt',
+                                probe.to.genes = my_gene_info, drug.info = my_drug_info)
+Drug.ident.res<-GetDrug(gene.data = Gene.list, drug.ref.profiles = cmap.ref.profiles, repurposing.unit = "drug", connectivity = "negative", drug.type = "FDA")
+
+
+saveRDS(Drug.ident.res,file=(paste0("HER2_ER_drugs_FDA.rds")))
+
+
+
+
+
+
+#Drug score
+library(Seurat)
+library(Asgard)
+library(cmapR)
+#SC.integrated<-readRDS("TNBC_SCdata.rds")
+#Gene.list<-readRDS("TNBC_genelist_limma.rds")
+#Drug.ident.res<-readRDS("TNBC_drugs_limma.rds")
+GSE92742.gctx.path="~/Documents/HuLab/GSE92742_Broad_LINCS_Level5_COMPZ.MODZ_n473647x12328.gctx"
+GSE70138.gctx.path="~/Documents/HuLab/GSE70138_Broad_LINCS_Level5_COMPZ_n118050x12328_2017-03-06.gctx"
+Tissue="breast"
+
+#Gene.list<-readRDS(paste0("TNBC_genelist_",i,".rds"))
+#  Drug.ident.res<-readRDS(paste0("TNBC_drugs_FDA_",i,".rds"))  
+Drug.score<-DrugScore(SC.integrated=SC.merge,
+                        Gene.data=Gene.list,
+                        Cell.type=NULL,
+                        Drug.data=Drug.ident.res,
+                        FDA.drug.only=T,
+                        Case=Case,
+                        Tissue=Tissue,
+                        GSE92742.gctx=GSE92742.gctx.path,
+                        GSE70138.gctx=GSE70138.gctx.path)
+  
+saveRDS(Drug.score,file=paste0("HER2_ER_drugscore_FDA.rds"))
+
+library(Hmisc)
+Final.drugs<-subset(Drug.score,Drug.therapeutic.score>quantile(Drug.score$Drug.therapeutic.score, 0.99,na.rm=T) & FDR <0.05)
+
+
+#Select drug for individual clusters
+Final.drugs<-TopDrug(SC.integrated=SC.merge,
+                     Drug.data=Drug.ident.res,
+                     Drug.FDR=0.19,
+                     FDA.drug.only=TRUE,
+                     Case="CID4066"
+)  
+
+
+#GSE92742.gctx.path="GSE92742_Broad_LINCS_Level5_COMPZ.MODZ_n473647x12328.gctx"
+#GSE70138.gctx.path="GSE70138_Broad_LINCS_Level5_COMPZ_n118050x12328_2017-03-06.gctx"
+Drug.combinations<-DrugCombination(SC.integrated=SC.merge,
+                                   Gene.data=Gene.list,
+                                   Drug.data=Drug.ident.res,
+                                   Drug.FDR=0.2,
+                                   FDA.drug.only=TRUE,
+                                   Combined.drugs=2,
+                                   Case="CID4066",
+                                   Tissue="breast",
+                                   GSE92742.gctx=GSE92742.gctx.path,
+                                   GSE70138.gctx=GSE70138.gctx.path)
+
+
+Final.combinations<-TopCombination(Drug.combination=Drug.combinations,
+                                   Combination.FDR=0.05,
+                                   Min.combination.score=1
+)
