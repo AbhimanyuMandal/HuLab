@@ -14,8 +14,9 @@ https://ftp.ncbi.nlm.nih.gov/geo/series/GSE92nnn/GSE92742/suppl/GSE92742_Broad_L
    D. Run PCA and UMAP for identifying cell types of the reference dataset
    E. Use the reference anchors to identify the cell types of the query dataset
    F. Plotting the cell type for visualization
-3. Using LIMMA for differential gene expression analysis. (adj. P Value = 0.05, P-value = 1e-20)
-4. Drug repurposing to calculate the drug score for the breast tissue.
-5. Identify the final drug using the condition: Drug therapeutic score>0.99 quantiles and FDR<0.05
-6. Identify drugs for individual clusters of cell types
-7. Identify drug combinations for the treatment of breast cancer. 
+   G. Integrate the reference and query dataset using the  "merge" function and further scale the data for further study
+4. Using LIMMA for differential gene expression analysis. (adj. P Value = 0.05, P-value = 1e-20)
+5. Drug repurposing to calculate the drug score for the breast tissue.
+6. Identify the final drug using the condition: Drug therapeutic score>0.99 quantiles and FDR<0.05
+7. Identify drugs for individual clusters of cell types
+8. Identify drug combinations for the treatment of breast cancer
